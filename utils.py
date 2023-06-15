@@ -30,17 +30,51 @@ def get_image_files_sorted(path, recurse=True, folders=None): return get_image_f
 from azure.cognitiveservices.search.imagesearch import ImageSearchClient as api
 from msrest.authentication import CognitiveServicesCredentials as auth
 
-def search_images_bing(key, term, min_sz=128, max_images=150):    
-     params = {'q':term, 'count':max_images, 'min_height':min_sz, 'min_width':min_sz}
-     headers = {"Ocp-Apim-Subscription-Key":key}
-     search_url = "https://api.bing.microsoft.com/v7.0/images/search"
-     response = requests.get(search_url, headers=headers, params=params)
-     response.raise_for_status()
-     search_results = response.json()    
-     return L(search_results['value'])
+# def search_images_bing(key, term, min_sz=128, max_images=150):    
+#      params = {'q':term, 'count':max_images, 'min_height':min_sz, 'min_width':min_sz}
+#      headers = {"Ocp-Apim-Subscription-Key":key}
+#      search_url = "https://api.bing.microsoft.com/v7.0/images/search"
+#      response = requests.get(search_url, headers=headers, params=params)
+#      response.raise_for_status()
+#      search_results = response.json()    
+#      return L(search_results['value'])
 
 
 # -
+
+from itertools import chain
+
+def search_images_bing(key, term, total_count=150, min_sz=128):
+    """Search for images using the Bing API
+    
+    :param key: Your Bing API key
+    :type key: str
+    :param term: The search term to search for
+    :type term: str
+    :param total_count: The total number of images you want to return (default is 150)
+    :type total_count: int
+    :param min_sz: the minimum height and width of the images to search for (default is 128)
+    :type min_sz: int
+    :returns: An L-collection of ImageObject
+    :rtype: L
+    """
+    max_count = 150
+    client = api("https://api.cognitive.microsoft.com", auth(key))
+    imgs = [
+        client.images.search(
+            query=term, min_height=min_sz, min_width=min_sz, count=count, offset=offset
+        ).value
+        for count, offset in (
+            (
+                max_count if total_count - offset > max_count else total_count - offset,
+                offset,
+            )
+            for offset in range(0, total_count, max_count)
+        )
+    ]
+    return L(chain(*imgs))
+
+
 
 def search_images_ddg(key,max_n=200):
      """Search for 'key' with DuckDuckGo and return a unique urls of 'max_n' images
